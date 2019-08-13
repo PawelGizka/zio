@@ -26,8 +26,10 @@ case class MockEnvironment(
   random: MockRandom.Mock,
   scheduler: MockClock.Mock,
   system: MockSystem.Mock,
-  blocking: Blocking.Service[Any]
+  blocking: Blocking.Service[Any],
+  nioService: NioExecutorService.Service
 ) extends Blocking
+    with NioExecutorService
     with MockClock
     with MockConsole
     with MockRandom
@@ -39,11 +41,12 @@ object MockEnvironment {
   val Value: Managed[Nothing, MockEnvironment] =
     Managed.fromEffect {
       for {
-        clock    <- MockClock.makeMock(MockClock.DefaultData)
-        console  <- MockConsole.makeMock(MockConsole.DefaultData)
-        random   <- MockRandom.makeMock(MockRandom.DefaultData)
-        system   <- MockSystem.makeMock(MockSystem.DefaultData)
-        blocking = Blocking.Live.blocking
-      } yield new MockEnvironment(clock, console, random, clock, system, blocking)
+        clock       <- MockClock.makeMock(MockClock.DefaultData)
+        console     <- MockConsole.makeMock(MockConsole.DefaultData)
+        random      <- MockRandom.makeMock(MockRandom.DefaultData)
+        system      <- MockSystem.makeMock(MockSystem.DefaultData)
+        blocking    = Blocking.Live.blocking
+        nioExecutor = NioExecutorService.Live.nioService
+      } yield new MockEnvironment(clock, console, random, clock, system, blocking, nioExecutor)
     }
 }

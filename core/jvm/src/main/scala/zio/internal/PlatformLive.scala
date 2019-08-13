@@ -26,6 +26,27 @@ import zio.internal.tracing.TracingConfig
 import scala.concurrent.ExecutionContext
 
 object PlatformLive {
+  lazy val DefaultExecutorService: ThreadPoolExecutor = {
+    val corePoolSize  = Runtime.getRuntime.availableProcessors() * 2
+    val maxPoolSize   = corePoolSize
+    val keepAliveTime = 1000L
+    val timeUnit      = TimeUnit.MILLISECONDS
+    val workQueue     = new LinkedBlockingQueue[Runnable]()
+    val threadFactory = new NamedThreadFactory("zio-default-async", true)
+
+    val threadPool = new ThreadPoolExecutor(
+      corePoolSize,
+      maxPoolSize,
+      keepAliveTime,
+      timeUnit,
+      workQueue,
+      threadFactory
+    )
+    threadPool.allowCoreThreadTimeOut(true)
+
+    threadPool
+  }
+
   lazy val Default = makeDefault()
   lazy val Global  = fromExecutionContext(ExecutionContext.global)
 
@@ -40,7 +61,8 @@ object PlatformLive {
    * */
   lazy val Benchmark = makeDefault(Int.MaxValue).withReportFailure(_ => ()).withTracing(Tracing.disabled)
 
-  final def makeDefault(yieldOpCount: Int = 2048): Platform = fromExecutor(ExecutorUtil.makeDefault(yieldOpCount))
+  final def makeDefault(yieldOpCount: Int = 2048): Platform =
+    fromExecutor(ExecutorUtil.fromThreadPoolExecutor(_ => yieldOpCount)(DefaultExecutorService))
 
   final def fromExecutor(executor0: Executor) =
     new Platform {
@@ -72,28 +94,6 @@ object PlatformLive {
     fromExecutor(Executor.fromExecutionContext(1024)(ec))
 
   object ExecutorUtil {
-    final def makeDefault(yieldOpCount: Int): Executor =
-      fromThreadPoolExecutor(_ => yieldOpCount) {
-        val corePoolSize  = Runtime.getRuntime.availableProcessors() * 2
-        val maxPoolSize   = corePoolSize
-        val keepAliveTime = 1000L
-        val timeUnit      = TimeUnit.MILLISECONDS
-        val workQueue     = new LinkedBlockingQueue[Runnable]()
-        val threadFactory = new NamedThreadFactory("zio-default-async", true)
-
-        val threadPool = new ThreadPoolExecutor(
-          corePoolSize,
-          maxPoolSize,
-          keepAliveTime,
-          timeUnit,
-          workQueue,
-          threadFactory
-        )
-        threadPool.allowCoreThreadTimeOut(true)
-
-        threadPool
-      }
-
     final def fromThreadPoolExecutor(yieldOpCount0: ExecutionMetrics => Int)(
       es: ThreadPoolExecutor
     ): Executor =
